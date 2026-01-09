@@ -1,35 +1,56 @@
 #pragma once
+#define JWT_DISABLE_PICOJSON
+#include <nlohmann/json.hpp>
 #include <jwt-cpp/jwt.h>
-#include "db_manager.hpp"
+#include <jwt-cpp/traits/nlohmann-json/traits.h>
+#include <string>
+#include "dbmanager.hpp"
 
 class AuthHandler {
 public:
-    // Возвращает 200 (OK), 401 (Unauthorized) или 418 (Blocked)
+    using nlohmann_traits = jwt::traits::nlohmann_json;
+
     static int check_access(const std::string& token, const std::string& permission, DBManager& db) {
         try {
-            auto decoded = jwt::decode(token);
-            // Проверка подписи (замените "secret" на ваш ключ из модуля Auth)
-            auto verifier = jwt::verify().allow_algorithm(jwt::algorithm::hs256{"secret"});
+            // 1. Декодирование токена
+            auto decoded = jwt::decode<nlohmann_traits>(token);
+
+            // 2. Верификация (секрет должен совпадать с модулем Авторизации)
+            auto verifier = jwt::verify<nlohmann_traits>()
+                .allow_algorithm(jwt::algorithm::hs256{ "secret" });
             verifier.verify(decoded);
 
-            std::string email = decoded.get_payload_claim("email").as_string();
+            // 3. Получение данных пользователя (Payload)
+            auto payload = decoded.get_payload_json();
+            std::string email = payload["email"].get<std::string>();
 
-            // Проверка блокировки в БД
-            const char* params[] = { email.c_str() };
+            // 4. Проверка блокировки в БД (ТЗ: код 418)
+            const char* params[1] = { email.c_str() };
             PGresult* res = db.query("SELECT is_blocked FROM users WHERE email = $1", {params[0]});
             
-            if (PQntuples(res) == 0) return 401;
-            bool is_blocked = (std::string(PQgetvalue(res, 0, 0)) == "t");
-            PQclear(res);
+            if (PQntuples(res) > 0) {
+                std::string is_blocked = PQgetvalue(res, 0, 0);
+                PQclear(res);
+                // Если пользователь заблокирован, запрещены все действия
+                if (is_blocked == "t") return 418; 
+            } else {
+                PQclear(res);
+            }
 
-            if (is_blocked) return 418; // Возвращаем статус "Я - чайник"
+            // 5. Проверка прав (ТЗ: код 403)
+            // Проверяем наличие ключа "permissions" простым обращением
+            if (payload.count("permissions") && payload["permissions"].is_array()) {
+                auto perms = payload["permissions"];
+                for (auto& item : perms) {
+                    if (item.get<std::string>() == permission) {
+                        return 200; // Разрешение найдено
+                    }
+                }
+            }
 
-            // Проверка конкретного разрешения в клеймах токена
-            auto perms = decoded.get_payload_claim("permissions").as_set<std::string>();
-            if (perms.find(permission) == perms.end()) return 403;
-
-            return 200;
+            return 403; // Разрешения нет
         } catch (...) {
+            // Любая ошибка (устаревший токен и т.д.) -> 401
             return 401;
         }
     }
