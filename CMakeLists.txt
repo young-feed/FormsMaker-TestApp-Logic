@@ -1,21 +1,24 @@
 cmake_minimum_required(VERSION 3.15)
-project(PostgresMainModule)
+project(MainModule)
 
 set(CMAKE_CXX_STANDARD 17)
 
-# Поиск зависимостей через vcpkg
-find_package(libpq REQUIRED)         # Базовая библиотека C
+# Явно указываем пути к вашей установленной PostgreSQL
+# ЗАМЕНИТЕ "16" на вашу версию
+set(POSTGRES_PATH "C:/Program Files/PostgreSQL/18")
+
+include_directories("${POSTGRES_PATH}/include")
+link_directories("${POSTGRES_PATH}/lib")
+
+# Поиск nlohmann_json и jwt-cpp через vcpkg
 find_package(nlohmann_json REQUIRED)
 find_package(jwt-cpp REQUIRED)
 
 add_executable(main_module main.cpp)
 
-# Линкуем libpq и другие библиотеки
+# Линкуем библиотеки
 target_link_libraries(main_module PRIVATE 
-    ${PostgreSQL_LIBRARIES} 
+    libpq 
     nlohmann_json::nlohmann_json 
     jwt-cpp::jwt-cpp
 )
-
-# Добавляем пути к заголовочным файлам PostgreSQL
-target_include_directories(main_module PRIVATE ${PostgreSQL_INCLUDE_DIRS})
