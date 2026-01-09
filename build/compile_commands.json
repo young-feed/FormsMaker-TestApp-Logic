@@ -1,0 +1,8 @@
+[
+{
+  "directory": "C:/projects/cpp/FormsMaker/build",
+  "command": "C:\\PROGRA~2\\MICROS~3\\18\\BUILDT~1\\VC\\Tools\\MSVC\\1450~1.357\\bin\\Hostx64\\x64\\cl.exe  /nologo /TP -DBROTLI_SHARED_COMPILATION -DCPPHTTPLIB_BROTLI_SUPPORT -DCPPHTTPLIB_USE_NON_BLOCKING_GETADDRINFO -DJWT_DISABLE_PICOJSON -I\"C:\\Program Files\\PostgreSQL\\18\\include\" -external:IC:\\vcpkg\\installed\\x64-windows\\include -external:W0 /DWIN32 /D_WINDOWS /GR /EHsc /Zi /Ob0 /Od /RTC1 -std:c++17 -MDd /FoCMakeFiles\\main_module.dir\\main.cpp.obj /FdCMakeFiles\\main_module.dir\\ /FS -c C:\\projects\\cpp\\FormsMaker\\main.cpp",
+  "file": "C:/projects/cpp/FormsMaker/main.cpp",
+  "output": "C:/projects/cpp/FormsMaker/build/CMakeFiles/main_module.dir/main.cpp.obj"
+}
+]

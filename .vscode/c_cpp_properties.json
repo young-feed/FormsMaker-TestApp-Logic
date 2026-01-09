@@ -3,7 +3,9 @@
         {
             "name": "Win32",
             "includePath": [
-                "${workspaceFolder}/**"
+                "${workspaceFolder}/**",
+                "C:/vcpkg/installed/x64-windows/include",
+                "C:/Program Files/PostgreSQL/18/include"
             ],
             "defines": [
                 "_DEBUG",
