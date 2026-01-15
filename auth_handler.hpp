@@ -5,71 +5,40 @@
 #include <jwt-cpp/traits/nlohmann-json/traits.h>
 #include <string>
 #include "dbmanager.hpp"
+#include <httplib.h> 
 
 class AuthHandler
 {
 public:
     using nlohmann_traits = jwt::traits::nlohmann_json;
 
-    static int check_access(const std::string &token, const std::string &required_permission, DBManager &db)
-    {
-        // 1. ПРОВЕРКА ВАЛИДНОСТИ ТОКЕНА
-        // Если токен пустой или не может быть декодирован — 401 Unauthorized
-        if (token.empty())
-            return 401;
-
-        std::string user_id;
-        try
-        {
-            auto decoded = jwt::decode(token);
-            // Извлекаем ID пользователя из claim "id" или "sub"
-            user_id = decoded.get_payload_claim("id").as_string();
-        }
-        catch (...)
-        {
-            return 401;
-        }
-
-        // 2. ПРОВЕРКА БЛОКИРОВКИ (ТРЕБОВАНИЕ ТЗ: КОД 418)
-        // "Для пользователя запрещены все действия... На любой запрос нужен код 418"
-        PGresult *res_block = db.query("SELECT is_blocked FROM users WHERE id = $1", {user_id});
-
-        if (PQntuples(res_block) == 0)
-        {
-            PQclear(res_block);
-            return 401; // Пользователь не найден в базе
-        }
-
-        bool blocked = std::string(PQgetvalue(res_block, 0, 0)) == "t";
-        PQclear(res_block);
-
-        if (blocked)
-        {
-            return 418; // Статус I'm a teapot согласно таблице
-        }
-
-        // 3. ПРОВЕРКА ПРАВ ДОСТУПА (PERMISSIONS)
-        // Если право не требуется (пустая строка), возвращаем 200
-        if (required_permission.empty())
-            return 200;
-
-        // Проверяем наличие записи в таблице ролей/разрешений
-        PGresult *res_perm = db.query(
-            "SELECT 1 FROM user_roles WHERE user_id = $1 AND role_name = $2",
-            {user_id, required_permission});
-
-        bool has_permission = PQntuples(res_perm) > 0;
-        PQclear(res_perm);
-
-        if (!has_permission)
-        {
-            return 403; // Forbidden — токен верный, но прав "меньше", чем нужно
-        }
-
-        return 200; // Доступ разрешен
+    static int AuthHandler::check_access(const std::string& token, const std::string& permission, DBManager& db) {
+    // 1. Сначала проверяем блокировку в локальной БД (как требует ТЗ)
+    std::string user_id = get_id_from_token(token);
+    PGresult* res = db.query("SELECT is_blocked FROM users WHERE id = $1", {user_id});
+    if (PQntuples(res) > 0 && std::string(PQgetvalue(res, 0, 0)) == "t") {
+        PQclear(res);
+        return 418; // I'm a teapot (заблокирован)
     }
+    PQclear(res);
 
-    bool is_owner(const std::string &token, const std::string &course_id, DBManager &db)
+    // 2. Отправляем запрос в модуль на Go для проверки прав
+    httplib::Client cli("http://localhost:8081"); // Адрес вашего Go модуля
+    
+    nlohmann::json body = {
+        {"token", token},
+        {"permission", permission}
+    };
+
+    if (auto res = cli.Post("/verify", body.dump(), "application/json")) {
+        if (res->status == 200) return 200; // Доступ разрешен
+        if (res->status == 403) return 403; // Нет прав
+    }
+    
+    return 401; // Ошибка авторизации или сервиса
+}
+
+    static bool is_owner(const std::string &token, const std::string &course_id, DBManager &db)
     {
         std::string user_id = AuthHandler::get_id_from_token(token);
         if (user_id.empty())
@@ -80,6 +49,42 @@ public:
         bool owned = (PQntuples(res) > 0);
         PQclear(res);
 
+        return owned;
+    }
+
+    static bool is_course_teacher(const std::string& token, const std::string& course_id, DBManager& db) {
+    // 1. Извлекаем ID пользователя из токена
+    std::string user_id = get_id_from_token(token);
+    if (user_id.empty() || course_id.empty()) return false;
+
+    // 2. Проверяем в таблице courses, назначен ли этот пользователь преподавателем
+    // Предполагается, что в БД есть колонка teacher_id (или автор курса)
+    PGresult* res = db.query(
+        "SELECT 1 FROM courses WHERE id = $1 AND teacher_id = $2 AND is_deleted = false", 
+        {course_id, user_id}
+    );
+
+    bool is_teacher = (PQntuples(res) > 0);
+    PQclear(res);
+    
+    return is_teacher;
+}
+
+    static bool is_question_owner(const std::string& token, const std::string& logical_id, DBManager& db) {
+        // 1. Извлекаем ID текущего пользователя из JWT токена
+        std::string user_id = get_id_from_token(token);
+        if (user_id.empty()) return false;
+
+        // 2. Проверяем в базе данных, является ли этот пользователь автором вопроса
+        // Используем logical_id, так как авторство распространяется на все версии вопроса
+        PGresult* res = db.query(
+            "SELECT 1 FROM questions WHERE logical_id = $1 AND author_id = $2 LIMIT 1", 
+            {logical_id, user_id}
+        );
+
+        bool owned = (PQntuples(res) > 0);
+        PQclear(res);
+        
         return owned;
     }
 
