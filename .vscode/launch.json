@@ -8,7 +8,7 @@
             "name": "(Windows) Запустить",
             "type": "cppvsdbg",
             "request": "launch",
-            "program": "${workspaceFolder}/main.exe",
+            "program": "${workspaceFolder}/build/main_module.exe",
             "args": [],
             "stopAtEntry": false,
             "cwd": "${fileDirname}",

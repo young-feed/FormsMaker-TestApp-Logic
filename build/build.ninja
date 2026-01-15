@@ -74,7 +74,7 @@ build main_module.exe: CXX_EXECUTABLE_LINKER__main_module_Debug CMakeFiles\main_
   LINK_LIBRARIES = libpq.lib  C:\vcpkg\installed\x64-windows\debug\lib\libssl.lib  C:\vcpkg\installed\x64-windows\debug\lib\libcrypto.lib  ws2_32.lib  crypt32.lib  C:\vcpkg\installed\x64-windows\debug\lib\brotlienc.lib  C:\vcpkg\installed\x64-windows\debug\lib\brotlidec.lib  C:\vcpkg\installed\x64-windows\debug\lib\brotlicommon.lib  kernel32.lib user32.lib gdi32.lib winspool.lib shell32.lib ole32.lib oleaut32.lib uuid.lib comdlg32.lib advapi32.lib
   LINK_PATH = -LIBPATH:C:\PROGRA~1\POSTGR~1\18\lib
   OBJECT_DIR = CMakeFiles\main_module.dir
-  POST_BUILD = C:\Windows\system32\cmd.exe /C "cd /D C:\projects\cpp\FormsMaker\build && C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/projects/cpp/FormsMaker/build/main_module.exe -installedDir C:/vcpkg/installed/x64-windows/debug/bin -OutVariable out"
+  POST_BUILD = C:\Windows\system32\cmd.exe /C "cd /D C:\projects\cpp\FormsMaker\build && C:\Windows\SysWOW64\WindowsPowerShell\v1.0\powershell.exe -noprofile -executionpolicy Bypass -file C:/vcpkg/scripts/buildsystems/msbuild/applocal.ps1 -targetBinary C:/projects/cpp/FormsMaker/build/main_module.exe -installedDir C:/vcpkg/installed/x64-windows/debug/bin -OutVariable out && cd /D C:\projects\cpp\FormsMaker\build && "C:\Program Files (x86)\Microsoft Visual Studio\18\BuildTools\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe" -E copy_if_different /bin/libpq.dll C:/projects/cpp/FormsMaker/build"
   PRE_LINK = cd .
   TARGET_COMPILE_PDB = CMakeFiles\main_module.dir\
   TARGET_FILE = main_module.exe

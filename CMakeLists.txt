@@ -23,3 +23,9 @@ target_link_libraries(main_module PRIVATE
     jwt-cpp::jwt-cpp
     httplib::httplib
 )
+
+add_custom_command(TARGET main_module POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different
+    "${PostgreSQL_ROOT}/bin/libpq.dll"
+    $<TARGET_FILE_DIR:main_module>
+)

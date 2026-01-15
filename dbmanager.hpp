@@ -17,8 +17,42 @@ public:
     PGconn* get_conn() { return conn; }
 
     // Вспомогательная функция для выполнения запросов
-    PGresult* query(const std::string& sql, const std::vector<const char*>& params) {
-        return PQexecParams(conn, sql.c_str(), params.size(), NULL, params.data(), NULL, NULL, 0);
+    PGresult* DBManager::query(const std::string& sql, const std::vector<std::string>& params) {
+    // Преобразуем std::vector<std::string> в массив const char* для libpq
+    std::vector<const char*> paramValues;
+    for (const auto& p : params) {
+        paramValues.push_back(p.c_str());
+    }
+
+    PGresult* res = PQexecParams(
+        conn,
+        sql.c_str(),
+        params.size(),       // количество параметров
+        nullptr,             // типы параметров (Postgres определит сам)
+        paramValues.data(),  // значения параметров
+        nullptr,             // длины (не нужны для текстового формата)
+        nullptr,             // форматы (текст)
+        0                    // результат в текстовом формате
+    );
+
+    return res;
+    }
+
+    nlohmann::json pg_to_json(PGresult* res) {
+        auto j_array = nlohmann::json::array();
+        int rows = PQntuples(res);
+        int cols = PQnfields(res);
+
+        for (int i = 0; i < rows; i++) {
+            nlohmann::json item;
+            for (int j = 0; j < cols; j++) {
+                std::string col_name = PQfname(res, j);
+                std::string col_value = PQgetvalue(res, i, j);
+                item[col_name] = col_value;
+            }
+            j_array.push_back(item);
+        }
+        return j_array;
     }
 
     bool soft_delete_course(int course_id) {
@@ -36,18 +70,38 @@ public:
     }
 
     // Метод для версионности вопросов
-    bool add_question_version(int id, const std::string& text, const std::string& options, int version) {
-        std::string s_id = std::to_string(id);
-        std::string s_ver = std::to_string(version);
-        const char* params[4] = { s_id.c_str(), text.c_str(), options.c_str(), s_ver.c_str() };
+    // Метод для создания новой версии вопроса
+bool create_new_question_version(int logical_id, const std::string& text, const std::string& options_json) {
+    std::string s_id = std::to_string(logical_id);
+    
+    // SQL: Вставляем новую запись, вычисляя следующую версию как MAX(version) + 1
+    // COALESCE(..., 0) нужен, если это вообще первая запись для этого id
+    const char* sql = 
+        "INSERT INTO questions (id, question_text, options, version) "
+        "VALUES ($1, $2, $3, "
+        "  (SELECT COALESCE(MAX(version), 0) + 1 FROM questions WHERE id = $1)"
+        ");";
 
-        PGresult* ins_res = query(
-            "INSERT INTO questions (id, text, options, version) VALUES ($1, $2, $3, $4)", 
-            {params[0], params[1], params[2], params[3]}
-        );
+    const char* params[3] = { s_id.c_str(), text.c_str(), options_json.c_str() };
+    
+    PGresult* res = PQexecParams(
+        conn,             // Ваш объект PGconn*
+        sql,
+        3,                // Количество параметров
+        NULL,             // Типы параметров (NULL — пусть Postgres определит сам)
+        params,
+        NULL,             // Длины параметров
+        NULL,             // Форматы параметров (0 — текст)
+        0                 // Формат результата (0 — текст)
+    );
 
-        bool success = (PQresultStatus(ins_res) == PGRES_COMMAND_OK);
-        PQclear(ins_res);
-        return success;
+    if (PQresultStatus(res) != PGRES_COMMAND_OK) {
+        std::cerr << "Ошибка при создании версии вопроса: " << PQerrorMessage(conn) << std::endl;
+        PQclear(res);
+        return false;
     }
+
+    PQclear(res);
+    return true;
+}
 }; // Обязательно точка с запятой после класса!
