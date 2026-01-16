@@ -23,6 +23,18 @@ int main()
     // 2. Инициализация сервера
     httplib::Server svr;
 
+    // Обработчик для всех запросов после их выполнения
+    svr.set_post_routing_handler([](const httplib::Request& req, httplib::Response& res) {
+        res.set_header("Access-Control-Allow-Origin", "*"); // Разрешить запросы от веб-клиента
+        res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
+        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    });
+
+    // Ответ на Preflight-запросы от браузера (Nginx может перехватывать их сам, но лучше продублировать)
+    svr.Options(R"(.*)", [](const httplib::Request& req, httplib::Response& res) {
+        res.status = 204;
+    });
+
     // 1. Посмотреть список пользователей (ID и ФИО)
     svr.Get("/users", [&](const httplib::Request &req, httplib::Response &res)
             {
@@ -613,27 +625,34 @@ int main()
         res.status = 200;
     });
 
-    // Обработчик для всех запросов после их выполнения
-    svr.set_post_routing_handler([](const httplib::Request& req, httplib::Response& res) {
-        res.set_header("Access-Control-Allow-Origin", "*"); // Разрешить запросы от веб-клиента
-        res.set_header("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS");
-        res.set_header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    });
-
-    // Ответ на Preflight-запросы от браузера (Nginx может перехватывать их сам, но лучше продублировать)
-    svr.Options(R"(.*)", [](const httplib::Request& req, httplib::Response& res) {
-        res.status = 204;
-    });
-    // Вызывается только Go-модулем внутри локальной сети
+// Этот эндпоинт вызывается Go-модулем, когда в MongoDB меняется статус пользователя
     svr.Post("/internal/sync-block", [&](const httplib::Request& req, httplib::Response& res) {
-        auto j = json::parse(req.body); // { "user_id": "...", "is_blocked": true }
-        
-        std::string sql = "UPDATE users SET is_blocked = $1 WHERE id = $2";
-        db.query(sql, { j["is_blocked"].get<bool>() ? "true" : "false", j["user_id"] });
-        
-        res.status = 200;
+        try {
+            auto j = nlohmann::json::parse(req.body);
+            
+            // Go-модуль работает с Email, поэтому ищем по нему
+            std::string email = j.at("email").get<std::string>();
+            bool is_blocked = j.at("blocked").get<bool>();
+
+            // Обновляем локальную таблицу в PostgreSQL
+            PGresult* r = db.query(
+                "UPDATE users SET is_blocked = $1 WHERE email = $2", 
+                { (is_blocked ? "true" : "false"), email }
+            );
+
+            if (PQresultStatus(r) == PGRES_COMMAND_OK) {
+                res.status = 200;
+                res.set_content("{\"status\":\"synced\"}", "application/json");
+            } else {
+                res.status = 500;
+            }
+            PQclear(r);
+        } catch (...) {
+            res.status = 400; // Ошибка формата JSON
+        }
     });
 
+    
     svr.Get("/", [](const httplib::Request &req, httplib::Response &res)
             { res.set_content("<h1>Main Module is Running</h1><p>Server is alive!</p>", "text/html"); });
 
