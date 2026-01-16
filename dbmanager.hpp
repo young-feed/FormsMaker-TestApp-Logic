@@ -1,4 +1,5 @@
 #pragma once
+#include <nlohmann/json.hpp>
 #include <libpq-fe.h>
 #include <string>
 #include <stdexcept>
@@ -38,7 +39,7 @@ public:
     return res;
     }
 
-    nlohmann::json pg_to_json(PGresult* res) {
+    static nlohmann::json pg_to_json(PGresult* res) {
         auto j_array = nlohmann::json::array();
         int rows = PQntuples(res);
         int cols = PQnfields(res);
@@ -53,6 +54,13 @@ public:
             j_array.push_back(item);
         }
         return j_array;
+    }
+
+    static inline bool has_attempts(const std::string& test_id, DBManager& db) {
+        PGresult* res = db.query("SELECT 1 FROM attempts WHERE test_id = $1 LIMIT 1", {test_id});
+        bool exists = PQntuples(res) > 0;
+        PQclear(res);
+        return exists;
     }
 
     bool soft_delete_course(int course_id) {

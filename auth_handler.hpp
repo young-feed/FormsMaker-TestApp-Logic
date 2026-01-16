@@ -68,7 +68,7 @@ public:
     PQclear(res);
     
     return is_teacher;
-}
+    }
 
     static bool is_question_owner(const std::string& token, const std::string& logical_id, DBManager& db) {
         // 1. Извлекаем ID текущего пользователя из JWT токена
@@ -98,7 +98,7 @@ public:
         try
         {
             // Декодируем токен без верификации (верификация обычно делается в check_access)
-            auto decoded = jwt::decode(token);
+            auto decoded = jwt::decode<jwt::traits::nlohmann_json>(token);
 
             // В JWT идентификатор пользователя обычно хранится в поле "id" или "sub" (subject)
             // Убедитесь, что при генерации токена вы использовали то же имя поля

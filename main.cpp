@@ -522,7 +522,7 @@ int main()
             }
         }
 
-        res.set_content(DBManager::pg_to_json(r)[0].dump(), "application/json");
+        res.set_content(pg_to_json(r)[0].dump(), "application/json");
         PQclear(r);
     });
 
@@ -652,7 +652,7 @@ int main()
         }
     });
 
-    
+
     svr.Get("/", [](const httplib::Request &req, httplib::Response &res)
             { res.set_content("<h1>Main Module is Running</h1><p>Server is alive!</p>", "text/html"); });
 

@@ -10,8 +10,8 @@ include_directories("${POSTGRES_PATH}/include")
 link_directories("${POSTGRES_PATH}/lib")
 
 # Поиск nlohmann_json и jwt-cpp через vcpkg
-find_package(nlohmann_json REQUIRED)
-find_package(jwt-cpp REQUIRED)
+find_package(nlohmann_json CONFIG REQUIRED)
+find_package(jwt-cpp CONFIG REQUIRED)
 find_package(httplib REQUIRED)
 
 add_executable(main_module main.cpp)
